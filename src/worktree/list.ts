@@ -7,9 +7,7 @@ const messages = {
 };
 
 class WorktreeList {
-  constructor() {}
-
-  async init() {
+  async init(): Promise<void> {
     const worktrees = worktreeLibrary.getWorktrees();
 
     if (worktrees.length === 0) {

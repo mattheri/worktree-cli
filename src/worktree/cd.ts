@@ -2,14 +2,21 @@ import fs from 'fs';
 import enquirer from 'enquirer';
 import { worktreeLibrary } from './worktree.library.js';
 
-const { AutoComplete } = enquirer;
+interface PromptCtor {
+  new (options: {
+    name: string;
+    message: string;
+    choices: Array<{ name: string; message: string }>;
+    limit?: number;
+  }): { run(): Promise<string> };
+}
+
+const { AutoComplete } = enquirer as unknown as { AutoComplete: PromptCtor };
 
 const CD_TARGET_FILE = '/tmp/.wt-cd-target';
 
 class WorktreeCd {
-  constructor() {}
-
-  async init() {
+  async init(): Promise<void> {
     const worktrees = worktreeLibrary.getWorktrees();
 
     if (worktrees.length === 0) {

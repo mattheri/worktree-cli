@@ -11,15 +11,21 @@
   ],
   "type": "module",
   "bin": {
-    "wt-cli": "tools/worktree.cli.js"
+    "wt-cli": "dist/worktree.cli.js"
   },
   "files": [
-    "tools",
+    "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "dev": "node tools/worktree.cli.js"
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "dev": "tsx src/worktree.cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run clean && npm run build"
   },
   "engines": {
     "node": ">=18"
@@ -36,5 +42,12 @@
   },
   "dependencies": {
     "enquirer": "^2.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   }
 }

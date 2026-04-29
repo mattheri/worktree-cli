@@ -1,23 +1,21 @@
 import { colors } from '../extras/colors.js';
-import { worktreeLibrary } from './worktree.library.js';
+import { worktreeLibrary, type WorktreeStatus } from './worktree.library.js';
 
 const messages = {
   scanning: `\n🔍 Scanning worktrees...`,
-  autoRemoved: (branch) =>
+  autoRemoved: (branch: string) =>
     `  ${colors.green}✓${colors.reset} Removed ${colors.cyan}${branch}${colors.reset} (merged to master)`,
-  promptRemove: (branch, status) =>
+  promptRemove: (branch: string, status: WorktreeStatus) =>
     `Remove ${colors.cyan}${branch}${colors.reset}? (${status === 'dirty' ? colors.yellow + 'dirty' + colors.reset : 'clean'}, not merged)`,
   pruning: `\n🧹 Pruning stale references...`,
   noWorktrees: `${colors.yellow}No worktrees found.${colors.reset}`,
-  done: (count) =>
+  done: (count: number) =>
     `\n${colors.green}Done!${colors.reset} Removed ${count} worktree${count !== 1 ? 's' : ''}.`,
   nothingToClean: `\n${colors.green}All clean!${colors.reset} No worktrees to remove.`,
 };
 
 class WorktreeClean {
-  constructor() {}
-
-  async init() {
+  async init(): Promise<void> {
     const worktrees = worktreeLibrary.getWorktrees();
 
     if (worktrees.length === 0) {

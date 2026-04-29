@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { fileURLToPath } from 'url';
 import enquirer from 'enquirer';
 import { colors } from './extras/colors.js';
 import { toolsUtility } from './extras/utils.js';
@@ -10,6 +11,12 @@ import { WorktreeUpdate } from './worktree/update.js';
 import { WorktreeSetup } from './worktree/setup.js';
 
 const { prompt } = enquirer;
+
+export type Action = 'list' | 'cd' | 'root' | 'clean' | 'update' | 'setup' | 'exit';
+
+interface InitOptions {
+  action?: Action | string | true | null;
+}
 
 const messages = {
   actions: {
@@ -31,7 +38,7 @@ const errorMessages = {
 
 class WorktreeCLI {
   constructor() {
-    const baseConfig = {
+    const baseConfig: InitOptions = {
       action: toolsUtility.getFlag('action'),
     };
 
@@ -39,46 +46,49 @@ class WorktreeCLI {
       console.clear();
     }
 
-    this.init(baseConfig);
+    void this.init(baseConfig);
   }
 
-  async init({ action } = {}) {
+  async init({ action }: InitOptions = {}): Promise<void> {
     try {
-      if (!action) {
+      if (!action || action === true) {
         action = await this.selectAction();
       }
 
       switch (action) {
-        case 'list':
+        case 'list': {
           const list = new WorktreeList();
           await list.init();
-          this.init();
+          void this.init();
           break;
-        case 'cd':
+        }
+        case 'cd': {
           const cd = new WorktreeCd();
           await cd.init();
-          // Do not re-initialize — exit so shell wrapper can cd
           break;
-        case 'root':
+        }
+        case 'root': {
           const root = new WorktreeRoot();
           await root.init();
-          // Do not re-initialize — exit so shell wrapper can cd
           break;
-        case 'clean':
+        }
+        case 'clean': {
           const clean = new WorktreeClean();
           await clean.init();
-          this.init();
+          void this.init();
           break;
-        case 'update':
+        }
+        case 'update': {
           const update = new WorktreeUpdate();
           await update.init();
-          this.init();
+          void this.init();
           break;
-        case 'setup':
+        }
+        case 'setup': {
           const setup = new WorktreeSetup();
           await setup.init();
-          // Do not re-initialize — one-time action
           break;
+        }
         case 'exit':
           console.log(messages.goodbye);
           break;
@@ -94,8 +104,8 @@ class WorktreeCLI {
     }
   }
 
-  async selectAction() {
-    const { action } = await prompt({
+  async selectAction(): Promise<Action> {
+    const { action } = await prompt<{ action: Action }>({
       type: 'select',
       name: 'action',
       message: messages.actionSelect,
@@ -114,4 +124,8 @@ class WorktreeCLI {
   }
 }
 
-new WorktreeCLI();
+export { WorktreeCLI };
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  new WorktreeCLI();
+}

@@ -5,11 +5,36 @@ import { getWorktreesDir } from './worktree.constants.js';
 
 const { prompt } = pkg;
 
-export const worktreeLibrary = {
+export type Worktree = {
+  path: string;
+  branch: string;
+};
+
+export type WorktreeStatus = 'clean' | 'dirty' | 'unknown';
+
+export type MergeResult =
+  | { status: 'updated' }
+  | { status: 'up-to-date' }
+  | { status: 'conflict'; message: string };
+
+export interface WorktreeLibrary {
+  getWorktrees(): Worktree[];
+  getMergedBranches(): Set<string>;
+  getWorktreeStatus(wtPath: string): WorktreeStatus;
+  removeWorktree(wtPath: string): boolean;
+  pruneWorktrees(): void;
+  fetchMaster(): void;
+  mergeMasterInto(wtPath: string): MergeResult;
+  stashPush(wtPath: string): boolean;
+  stashPop(wtPath: string): void;
+  promptConfirmation(message: string): Promise<boolean>;
+}
+
+export const worktreeLibrary: WorktreeLibrary = {
   getWorktrees() {
     const output = execSync('git worktree list --porcelain').toString();
     const blocks = output.split('\n\n').filter(Boolean);
-    const worktrees = [];
+    const worktrees: Worktree[] = [];
     const worktreesDir = getWorktreesDir();
 
     for (const block of blocks) {
@@ -21,7 +46,6 @@ export const worktreeLibrary = {
 
       const wtPath = pathLine.replace('worktree ', '');
 
-      // Only include worktrees under the worktrees directory
       if (!wtPath.startsWith(worktreesDir)) continue;
 
       const branch = branchLine ? branchLine.replace('branch refs/heads/', '') : '(detached)';
@@ -41,7 +65,7 @@ export const worktreeLibrary = {
         .filter(Boolean);
       return new Set(branches);
     } catch {
-      return new Set();
+      return new Set<string>();
     }
   },
 
@@ -61,14 +85,14 @@ export const worktreeLibrary = {
       execSync(`git worktree remove "${wtPath}"`, { stdio: 'pipe' });
       return true;
     } catch {
-      // If it fails (dirty tree), try with --force
       try {
         execSync(`git worktree remove --force "${wtPath}"`, { stdio: 'pipe' });
         return true;
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error(
           `${colors.red}Failed to remove worktree: ${wtPath}${colors.reset}`,
-          err.message
+          message
         );
         return false;
       }
@@ -94,18 +118,18 @@ export const worktreeLibrary = {
       try {
         execSync(`git -C "${wtPath}" merge --abort`, { stdio: 'pipe' });
       } catch {}
+      const errorWithStderr = err as { stderr?: { toString(): string }; message?: string };
       return {
         status: 'conflict',
-        message: err.stderr?.toString() || err.message,
+        message: errorWithStderr.stderr?.toString() || errorWithStderr.message || String(err),
       };
     }
   },
 
   stashPush(wtPath) {
-    const output = execSync(
-      `git -C "${wtPath}" stash push -u -m "wt-update autostash"`,
-      { stdio: 'pipe' }
-    ).toString();
+    const output = execSync(`git -C "${wtPath}" stash push -u -m "wt-update autostash"`, {
+      stdio: 'pipe',
+    }).toString();
     return !/No local changes to save/i.test(output);
   },
 
@@ -114,9 +138,9 @@ export const worktreeLibrary = {
   },
 
   async promptConfirmation(message) {
-    console.log(''); // Space things out a bit...
+    console.log('');
 
-    const { confirmed } = await prompt({
+    const { confirmed } = await prompt<{ confirmed: boolean }>({
       type: 'confirm',
       name: 'confirmed',
       message,

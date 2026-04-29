@@ -7,7 +7,7 @@ const MARKER = '# worktree-cli shell integration';
 
 // macOS Terminal.app opens login shells by default, which read .bash_profile
 // rather than .bashrc — so on darwin we target .bash_profile for bash users.
-function resolveRcFileName() {
+export function resolveRcFileName(): string | null {
   const shell = path.basename(process.env.SHELL || '');
 
   if (shell === 'zsh') return '.zshrc';
@@ -17,9 +17,7 @@ function resolveRcFileName() {
 }
 
 class WorktreeSetup {
-  constructor() {}
-
-  async init() {
+  async init(): Promise<void> {
     const rcFileName = resolveRcFileName();
 
     if (!rcFileName) {

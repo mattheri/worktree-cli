@@ -13,6 +13,6 @@ const colors = {
   resetBold: '\x1b[0;1m',
   yellow: '\x1b[33m',
   yellowBold: '\x1b[33;1m',
-};
+} as const;
 
 export { colors };
