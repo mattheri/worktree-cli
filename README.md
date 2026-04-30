@@ -55,7 +55,7 @@ It creates the worktree off `master`, `cd`s into it, and launches `claude` for y
 
 ### Choosing how `wt` creates worktrees
 
-The first time you run `wt --action create`, you're asked once how you'd like to add new worktrees: **with Claude** (creates the worktree, `cd`s in, launches `claude`) or **plain `git worktree add`**. Your choice is saved at `~/.config/wt-cli/config.json` (or `$XDG_CONFIG_HOME/wt-cli/config.json`). Delete that file to be re-prompted.
+The first time you run `wt --action create`, you're asked once how you'd like to add new worktrees: **with Claude** (creates the worktree, `cd`s in, launches `claude`) or **plain `git worktree add`**. Your choice is saved at `~/.wt-cli/config.json` (or `$XDG_CONFIG_HOME/wt-cli/config.json` if that env var is set). Delete that file to be re-prompted.
 
 `claude -w` always uses the Claude path regardless of this preference.
 

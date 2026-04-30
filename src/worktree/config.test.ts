@@ -30,9 +30,9 @@ describe('configPath', () => {
     else process.env.XDG_CONFIG_HOME = originalXdg;
   });
 
-  it('falls back to ~/.config/wt-cli/config.json when XDG_CONFIG_HOME unset', () => {
+  it('falls back to ~/.wt-cli/config.json when XDG_CONFIG_HOME unset', () => {
     delete process.env.XDG_CONFIG_HOME;
-    expect(configPath()).toBe('/home/me/.config/wt-cli/config.json');
+    expect(configPath()).toBe('/home/me/.wt-cli/config.json');
   });
 
   it('honors XDG_CONFIG_HOME when set', () => {
@@ -87,9 +87,9 @@ describe('saveConfig', () => {
 
   it('mkdir -ps the config dir and writes JSON', () => {
     saveConfig({ creator: 'git' });
-    expect(fs.mkdirSync).toHaveBeenCalledWith('/home/me/.config/wt-cli', { recursive: true });
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/home/me/.wt-cli', { recursive: true });
     expect(fs.writeFileSync).toHaveBeenCalledWith(
-      '/home/me/.config/wt-cli/config.json',
+      '/home/me/.wt-cli/config.json',
       '{\n  "creator": "git"\n}\n'
     );
     expect(warnSpy).not.toHaveBeenCalled();

@@ -10,7 +10,7 @@ export interface Config {
 
 function configDir(): string {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return xdg ? path.join(xdg, 'wt-cli') : path.join(os.homedir(), '.config', 'wt-cli');
+  return xdg ? path.join(xdg, 'wt-cli') : path.join(os.homedir(), '.wt-cli');
 }
 
 export function configPath(): string {
