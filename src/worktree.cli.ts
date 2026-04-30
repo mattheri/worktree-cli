@@ -7,12 +7,13 @@ import { WorktreeList } from './worktree/list.js';
 import { WorktreeCd } from './worktree/cd.js';
 import { WorktreeRoot } from './worktree/root.js';
 import { WorktreeClean } from './worktree/clean.js';
+import { WorktreeCreate } from './worktree/create.js';
 import { WorktreeUpdate } from './worktree/update.js';
-import { WorktreeSetup } from './worktree/setup.js';
+import { WorktreeSetup, isShellIntegrationInstalled } from './worktree/setup.js';
 
 const { prompt } = enquirer;
 
-export type Action = 'list' | 'cd' | 'root' | 'clean' | 'update' | 'setup' | 'exit';
+export type Action = 'list' | 'cd' | 'root' | 'clean' | 'create' | 'update' | 'setup' | 'exit';
 
 interface InitOptions {
   action?: Action | string | true | null;
@@ -21,10 +22,10 @@ interface InitOptions {
 const messages = {
   actions: {
     list: '📋 List worktrees',
-    cd: '📂 Change directory',
-    root: '🏠 Go to root',
+    cd: '📂 Checkout worktree',
+    root: '🏠 Checkout master',
     clean: '🧹 Clean worktrees',
-    update: '🔄 Update all worktrees with master',
+    update: '🔄 Update worktrees with master',
     setup: '⚙️  Setup shell integration',
     exit: '🚪 Exit',
   },
@@ -78,6 +79,11 @@ class WorktreeCLI {
           void this.init();
           break;
         }
+        case 'create': {
+          const create = new WorktreeCreate();
+          await create.init();
+          break;
+        }
         case 'update': {
           const update = new WorktreeUpdate();
           await update.init();
@@ -105,19 +111,25 @@ class WorktreeCLI {
   }
 
   async selectAction(): Promise<Action> {
+    const choices: Array<{ name: Action; message: string }> = [
+      { name: 'list', message: messages.actions.list },
+      { name: 'cd', message: messages.actions.cd },
+      { name: 'root', message: messages.actions.root },
+      { name: 'clean', message: messages.actions.clean },
+      { name: 'update', message: messages.actions.update },
+    ];
+
+    if (!isShellIntegrationInstalled()) {
+      choices.push({ name: 'setup', message: messages.actions.setup });
+    }
+
+    choices.push({ name: 'exit', message: messages.actions.exit });
+
     const { action } = await prompt<{ action: Action }>({
       type: 'select',
       name: 'action',
       message: messages.actionSelect,
-      choices: [
-        { name: 'list', message: messages.actions.list },
-        { name: 'cd', message: messages.actions.cd },
-        { name: 'root', message: messages.actions.root },
-        { name: 'clean', message: messages.actions.clean },
-        { name: 'update', message: messages.actions.update },
-        { name: 'setup', message: messages.actions.setup },
-        { name: 'exit', message: messages.actions.exit },
-      ],
+      choices,
     });
 
     return action;

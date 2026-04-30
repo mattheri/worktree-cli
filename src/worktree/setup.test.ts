@@ -15,8 +15,70 @@ vi.mock('os', () => ({
   },
 }));
 
+vi.mock('child_process', () => ({
+  execSync: vi.fn(),
+}));
+
 const fs = (await import('fs')).default;
-const { resolveRcFileName, WorktreeSetup } = await import('./setup.js');
+const { execSync } = await import('child_process');
+const { resolveRcFileName, isShellIntegrationInstalled, MARKER, WorktreeSetup } = await import(
+  './setup.js'
+);
+
+const CANONICAL_BLOCK = `# worktree-cli shell integration
+wt() {
+  rm -f /tmp/.wt-cd-target
+  wt-cli "$@"
+  if [[ -f /tmp/.wt-cd-target ]]; then
+    local target
+    target=$(cat /tmp/.wt-cd-target)
+    rm -f /tmp/.wt-cd-target
+    cd "$target"
+  fi
+}
+
+claude() {
+  if [[ "$1" == "-w" ]]; then
+    if [[ -z "$2" ]]; then
+      echo "claude -w requires a worktree name" >&2
+      return 1
+    fi
+    local name="$2"
+    shift 2
+    rm -f /tmp/.wt-cd-target
+    wt-cli --action=create --name="$name"
+    if [[ -f /tmp/.wt-cd-target ]]; then
+      local target
+      target=$(cat /tmp/.wt-cd-target)
+      rm -f /tmp/.wt-cd-target
+      cd "$target"
+      command claude "$@"
+    fi
+  else
+    command claude "$@"
+  fi
+}
+`;
+
+const STALE_LEGACY_BLOCK = `# worktree-cli shell integration
+wt() {
+  rm -f /tmp/.wt-cd-target
+  node /Users/me/worktree-cli/tools/worktree.cli.js "$@"
+  if [[ -f /tmp/.wt-cd-target ]]
+  then
+    local target
+    target=$(cat /tmp/.wt-cd-target)
+    rm -f /tmp/.wt-cd-target
+    cd "$target"
+  fi
+}
+`;
+
+const wtCliFound = () => vi.mocked(execSync).mockImplementation(() => Buffer.from(''));
+const wtCliMissing = () =>
+  vi.mocked(execSync).mockImplementation(() => {
+    throw new Error('not found');
+  });
 
 describe('resolveRcFileName', () => {
   let originalShell: string | undefined;
@@ -61,6 +123,42 @@ describe('resolveRcFileName', () => {
   });
 });
 
+describe('isShellIntegrationInstalled', () => {
+  let originalShell: string | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    originalShell = process.env.SHELL;
+    process.env.SHELL = '/bin/zsh';
+  });
+
+  afterEach(() => {
+    process.env.SHELL = originalShell;
+  });
+
+  it('returns true when MARKER is present in rc file', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(`# unrelated\n${MARKER}\nwt() {}\n`);
+    expect(isShellIntegrationInstalled()).toBe(true);
+  });
+
+  it('returns false when rc file lacks the MARKER', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('# nothing here\n');
+    expect(isShellIntegrationInstalled()).toBe(false);
+  });
+
+  it('returns false when rc file does not exist', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    expect(isShellIntegrationInstalled()).toBe(false);
+  });
+
+  it('returns false on unsupported shells', () => {
+    process.env.SHELL = '/usr/bin/fish';
+    expect(isShellIntegrationInstalled()).toBe(false);
+  });
+});
+
 describe('WorktreeSetup.init', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let originalShell: string | undefined;
@@ -71,6 +169,7 @@ describe('WorktreeSetup.init', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     originalShell = process.env.SHELL;
     originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+    process.env.SHELL = '/bin/zsh';
   });
 
   afterEach(() => {
@@ -87,17 +186,44 @@ describe('WorktreeSetup.init', () => {
     expect(fs.appendFileSync).not.toHaveBeenCalled();
   });
 
-  it('returns early with "already installed" when marker exists', async () => {
-    process.env.SHELL = '/bin/zsh';
+  it('logs "already installed" and writes nothing when block matches canonical', async () => {
+    wtCliFound();
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue('# worktree-cli shell integration\nexisting');
+    vi.mocked(fs.readFileSync).mockReturnValue(`# unrelated\n\n${CANONICAL_BLOCK}`);
     await new WorktreeSetup().init();
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('already installed'));
     expect(fs.appendFileSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it('migrates a legacy wt-only block to the full canonical block', async () => {
+    wtCliFound();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      `# prelude\n\n${STALE_LEGACY_BLOCK}# postlude\n`
+    );
+    await new WorktreeSetup().init();
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/home/me/.zshrc',
+      `# prelude\n\n${CANONICAL_BLOCK}# postlude\n`
+    );
+    expect(fs.appendFileSync).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Updated existing'));
+  });
+
+  it('aborts with guidance when stale block exists but wt-cli is missing', async () => {
+    wtCliMissing();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(STALE_LEGACY_BLOCK);
+    await new WorktreeSetup().init();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(fs.appendFileSync).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('wt-cli is not on your PATH'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('npm link'));
   });
 
   it('creates the rc file when missing and appends the shell function', async () => {
-    process.env.SHELL = '/bin/zsh';
+    wtCliFound();
     vi.mocked(fs.existsSync).mockReturnValue(false);
     vi.mocked(fs.readFileSync).mockReturnValue('');
     await new WorktreeSetup().init();
@@ -106,15 +232,29 @@ describe('WorktreeSetup.init', () => {
       '/home/me/.zshrc',
       expect.stringContaining('wt-cli "$@"')
     );
+    expect(fs.appendFileSync).toHaveBeenCalledWith(
+      '/home/me/.zshrc',
+      expect.stringContaining('claude()')
+    );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Shell integration added'));
   });
 
-  it('appends without recreating when rc file already exists without marker', async () => {
-    process.env.SHELL = '/bin/zsh';
+  it('appends without recreating when rc file exists without marker', async () => {
+    wtCliFound();
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue('# unrelated config\n');
     await new WorktreeSetup().init();
     expect(fs.writeFileSync).not.toHaveBeenCalled();
     expect(fs.appendFileSync).toHaveBeenCalled();
+  });
+
+  it('aborts with guidance when no block exists but wt-cli is missing', async () => {
+    wtCliMissing();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('# unrelated\n');
+    await new WorktreeSetup().init();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(fs.appendFileSync).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('wt-cli is not on your PATH'));
   });
 });

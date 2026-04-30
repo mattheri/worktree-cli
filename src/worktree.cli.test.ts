@@ -4,8 +4,10 @@ const listInit = vi.fn().mockResolvedValue(undefined);
 const cdInit = vi.fn().mockResolvedValue(undefined);
 const rootInit = vi.fn().mockResolvedValue(undefined);
 const cleanInit = vi.fn().mockResolvedValue(undefined);
+const createInit = vi.fn().mockResolvedValue(undefined);
 const updateInit = vi.fn().mockResolvedValue(undefined);
 const setupInit = vi.fn().mockResolvedValue(undefined);
+const isShellIntegrationInstalled = vi.fn().mockReturnValue(false);
 
 vi.mock('./worktree/list.js', () => ({
   WorktreeList: vi.fn(function (this: { init: typeof listInit }) {
@@ -27,6 +29,11 @@ vi.mock('./worktree/clean.js', () => ({
     this.init = cleanInit;
   }),
 }));
+vi.mock('./worktree/create.js', () => ({
+  WorktreeCreate: vi.fn(function (this: { init: typeof createInit }) {
+    this.init = createInit;
+  }),
+}));
 vi.mock('./worktree/update.js', () => ({
   WorktreeUpdate: vi.fn(function (this: { init: typeof updateInit }) {
     this.init = updateInit;
@@ -36,6 +43,7 @@ vi.mock('./worktree/setup.js', () => ({
   WorktreeSetup: vi.fn(function (this: { init: typeof setupInit }) {
     this.init = setupInit;
   }),
+  isShellIntegrationInstalled: () => isShellIntegrationInstalled(),
 }));
 
 const promptMock = vi.fn();
@@ -55,6 +63,7 @@ describe('WorktreeCLI', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    isShellIntegrationInstalled.mockReturnValue(false);
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     clearSpy = vi.spyOn(console, 'clear').mockImplementation(() => {});
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
@@ -76,6 +85,32 @@ describe('WorktreeCLI', () => {
     await new Promise((r) => setImmediate(r));
 
     expect(await cli.selectAction()).toBe('list');
+  });
+
+  it('selectAction includes setup choice when integration not installed', async () => {
+    isShellIntegrationInstalled.mockReturnValue(false);
+    promptMock.mockResolvedValueOnce({ action: 'exit' });
+    process.argv = ['node', 'cli', '--action', 'exit'];
+
+    const cli = new WorktreeCLI();
+    await new Promise((r) => setImmediate(r));
+    await cli.selectAction();
+
+    const choices = promptMock.mock.calls[0]![0].choices as Array<{ name: string }>;
+    expect(choices.map((c) => c.name)).toContain('setup');
+  });
+
+  it('selectAction omits setup choice when integration installed', async () => {
+    isShellIntegrationInstalled.mockReturnValue(true);
+    promptMock.mockResolvedValueOnce({ action: 'exit' });
+    process.argv = ['node', 'cli', '--action', 'exit'];
+
+    const cli = new WorktreeCLI();
+    await new Promise((r) => setImmediate(r));
+    await cli.selectAction();
+
+    const choices = promptMock.mock.calls[0]![0].choices as Array<{ name: string }>;
+    expect(choices.map((c) => c.name)).not.toContain('setup');
   });
 
   it('exit action logs goodbye without invoking other handlers', async () => {
@@ -132,6 +167,16 @@ describe('WorktreeCLI', () => {
 
     expect(cleanInit).toHaveBeenCalledTimes(1);
     expect(promptMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('create action runs WorktreeCreate.init and does NOT re-enter init', async () => {
+    process.argv = ['node', 'cli', '--action', 'create', '--name', 'foo'];
+
+    new WorktreeCLI();
+    await new Promise((r) => setImmediate(r));
+
+    expect(createInit).toHaveBeenCalledTimes(1);
+    expect(promptMock).not.toHaveBeenCalled();
   });
 
   it('update action runs WorktreeUpdate.init and re-enters init', async () => {
