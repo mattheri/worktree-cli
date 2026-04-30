@@ -117,6 +117,18 @@ describe('WorktreeCLI', () => {
     expect(choices.map((c) => c.name)).not.toContain('setup');
   });
 
+  it('selectAction always includes the create choice', async () => {
+    promptMock.mockResolvedValueOnce({ action: 'exit' });
+    process.argv = ['node', 'cli', '--action', 'exit'];
+
+    const cli = new WorktreeCLI();
+    await new Promise((r) => setImmediate(r));
+    await cli.selectAction();
+
+    const choices = promptMock.mock.calls[0]![0].choices as Array<{ name: string }>;
+    expect(choices.map((c) => c.name)).toContain('create');
+  });
+
   it('exit action logs goodbye without invoking other handlers', async () => {
     process.argv = ['node', 'cli', '--action', 'exit'];
 

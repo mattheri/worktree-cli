@@ -38,6 +38,7 @@ const messages = {
     list: '📋 List worktrees',
     cd: '📂 Checkout worktree',
     root: '🏠 Checkout master',
+    create: '➕ Create worktree',
     clean: '🧹 Clean worktrees',
     update: '🔄 Update worktrees with master',
     setup: '⚙️  Setup shell integration',
@@ -134,6 +135,7 @@ class WorktreeCLI {
       { name: 'list', message: messages.actions.list },
       { name: 'cd', message: messages.actions.cd },
       { name: 'root', message: messages.actions.root },
+      { name: 'create', message: messages.actions.create },
       { name: 'clean', message: messages.actions.clean },
       { name: 'update', message: messages.actions.update },
     ];
