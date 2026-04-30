@@ -4,8 +4,9 @@ import path from 'path';
 import enquirer from 'enquirer';
 import { colors } from '../extras/colors.js';
 import { toolsUtility } from '../extras/utils.js';
-import { getWorktreesDir } from './worktree.constants.js';
+import { getRepoRoot, getWorktreesDir } from './worktree.constants.js';
 import { loadConfig, saveConfig, type Creator } from './config.js';
+import { findHooks, runHook } from './hooks.js';
 
 const { prompt } = enquirer;
 
@@ -63,10 +64,26 @@ class WorktreeCreate {
 
     const creator = await resolveCreator(launchClaudeFlag);
 
-    const wtPath = path.join(dir, name);
-
+    const hooks = findHooks('WorktreeCreate', getRepoRoot());
+    let wtPath: string;
     try {
-      execSync(`git worktree add -b "${name}" "${wtPath}" master`, { stdio: 'pipe' });
+      if (hooks.length > 0) {
+        const out = runHook(hooks[0]!, {
+          name,
+          cwd: process.cwd(),
+          hook_event_name: 'WorktreeCreate',
+        });
+        if (!out || !fs.existsSync(out)) {
+          console.log(
+            `${colors.red}WorktreeCreate hook (${hooks[0]!.source}) did not produce a valid worktree path${colors.reset}`
+          );
+          return;
+        }
+        wtPath = out;
+      } else {
+        wtPath = path.join(dir, name);
+        execSync(`git worktree add -b "${name}" "${wtPath}" master`, { stdio: 'pipe' });
+      }
     } catch (err) {
       const e = err as { stderr?: { toString(): string }; message?: string };
       console.log(`${colors.red}Failed to create worktree:${colors.reset}`);

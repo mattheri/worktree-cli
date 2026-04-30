@@ -7,11 +7,20 @@ vi.mock('child_process', () => ({
 vi.mock('fs', () => ({
   default: {
     writeFileSync: vi.fn(),
+    existsSync: vi.fn(() => true),
   },
 }));
 
 vi.mock('./worktree.constants.js', () => ({
+  getRepoRoot: () => '/repo',
   getWorktreesDir: () => '/repo/.claude/worktrees',
+}));
+
+const findHooksMock = vi.fn();
+const runHookMock = vi.fn();
+vi.mock('./hooks.js', () => ({
+  findHooks: findHooksMock,
+  runHook: runHookMock,
 }));
 
 const promptMock = vi.fn();
@@ -82,6 +91,7 @@ describe('WorktreeCreate', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     originalArgv = process.argv;
     loadConfigMock.mockReturnValue({});
+    findHooksMock.mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -164,6 +174,46 @@ describe('WorktreeCreate', () => {
     expect(execSync).not.toHaveBeenCalled();
     expect(fs.writeFileSync).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('invalid'));
+  });
+
+  it('delegates to a registered WorktreeCreate hook and uses its stdout as the path', async () => {
+    process.argv = ['node', 'cli', '--action=create', '--name=feat', '--launch-claude'];
+    findHooksMock.mockReturnValue([
+      {
+        command: '.claude/hooks/create-worktree.sh',
+        cwd: '/repo',
+        source: '/repo/.claude/settings.json',
+      },
+    ]);
+    runHookMock.mockReturnValue('/repo/.claude/worktrees/feat');
+
+    await new WorktreeCreate().init();
+
+    expect(runHookMock).toHaveBeenCalledWith(
+      expect.objectContaining({ command: '.claude/hooks/create-worktree.sh' }),
+      expect.objectContaining({ name: 'feat', hook_event_name: 'WorktreeCreate' })
+    );
+    expect(execSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/tmp/.wt-cd-target',
+      '/repo/.claude/worktrees/feat'
+    );
+    expect(fs.writeFileSync).toHaveBeenCalledWith('/tmp/.wt-launch-claude', '1');
+  });
+
+  it('logs an error when the hook outputs a non-existent path', async () => {
+    process.argv = ['node', 'cli', '--action=create', '--name=feat', '--launch-claude'];
+    findHooksMock.mockReturnValue([
+      { command: 'hook.sh', cwd: '/repo', source: '/repo/.claude/settings.json' },
+    ]);
+    runHookMock.mockReturnValue('/nonexistent/path');
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    await new WorktreeCreate().init();
+
+    expect(execSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('did not produce a valid worktree'));
   });
 
   it('logs git stderr when worktree add fails and does not write cd target', async () => {
