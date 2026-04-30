@@ -1,6 +1,6 @@
 {
   "name": "@matheriault/worktree-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Interactive CLI for managing git worktrees: list, cd, clean, and bulk-update against master.",
   "keywords": [
     "git",

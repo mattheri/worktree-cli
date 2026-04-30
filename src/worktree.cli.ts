@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from 'fs';
 import { fileURLToPath } from 'url';
 import enquirer from 'enquirer';
 import { colors } from './extras/colors.js';
@@ -138,6 +139,8 @@ class WorktreeCLI {
 
 export { WorktreeCLI };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// argv[1] may be a symlink (e.g. npm's bin shim), so compare resolved real paths.
+const invokedPath = process.argv[1] ? realpathSync(process.argv[1]) : '';
+if (invokedPath === fileURLToPath(import.meta.url)) {
   new WorktreeCLI();
 }
