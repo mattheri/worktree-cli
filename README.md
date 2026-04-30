@@ -78,15 +78,14 @@ The CLI looks for worktrees under `<repo-root>/.claude/worktrees/`. Other worktr
 
 ## Uninstall
 
-```sh
-npm uninstall -g @matheriault/worktree-cli
-```
-
-A `preuninstall` hook removes the `wt` / `claude -w` shell block from your rc file automatically. If you used `--ignore-scripts`, run the cleanup manually first:
+Run the rc-file cleanup **before** removing the package — npm 7+ no longer fires `preuninstall` for global packages, so this step is manual:
 
 ```sh
 wt-cli --action uninstall
+npm uninstall -g @matheriault/worktree-cli
 ```
+
+If you've already removed the package, the `wt` / `claude -w` block is still in `~/.zshrc` (or `~/.bash_profile`); delete the lines between `# worktree-cli shell integration` and the second closing `}` (the one closing `claude()`).
 
 ## License
 

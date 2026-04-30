@@ -1,6 +1,6 @@
 {
   "name": "@matheriault/worktree-cli",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Interactive CLI for managing git worktrees: list, cd, clean, and bulk-update against master.",
   "keywords": [
     "git",
@@ -25,8 +25,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prepublishOnly": "npm run clean && npm run build && npm test",
-    "preuninstall": "node dist/worktree.cli.js --action uninstall || true"
+    "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "engines": {
     "node": ">=18"

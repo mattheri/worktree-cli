@@ -139,6 +139,9 @@ class WorktreeSetup {
     console.log(
       `Run ${colors.cyan}source ${displayPath}${colors.reset} or restart your shell to start using ${colors.bold}wt${colors.reset}.`
     );
+    console.log(
+      `${colors.dim}When you're done with this tool, run ${colors.reset}${colors.cyan}wt-cli --action uninstall${colors.reset}${colors.dim} BEFORE ${colors.reset}${colors.cyan}npm uninstall -g${colors.reset}${colors.dim} to clean up your rc file.${colors.reset}`
+    );
   }
 }
 
