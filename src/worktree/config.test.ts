@@ -73,9 +73,16 @@ describe('loadConfig', () => {
 });
 
 describe('saveConfig', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.XDG_CONFIG_HOME;
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
   });
 
   it('mkdir -ps the config dir and writes JSON', () => {
@@ -85,5 +92,18 @@ describe('saveConfig', () => {
       '/home/me/.config/wt-cli/config.json',
       '{\n  "creator": "git"\n}\n'
     );
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('warns and does not throw when mkdir fails (e.g. EACCES)', () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => {
+      const err = new Error('EACCES: permission denied') as NodeJS.ErrnoException;
+      err.code = 'EACCES';
+      throw err;
+    });
+
+    expect(() => saveConfig({ creator: 'claude' })).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Could not persist preference'));
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
   });
 });

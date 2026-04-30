@@ -31,6 +31,12 @@ export function loadConfig(): Config {
 
 export function saveConfig(cfg: Config): void {
   const p = configPath();
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + '\n');
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + '\n');
+  } catch (err) {
+    const msg = (err as { message?: string }).message ?? String(err);
+    console.warn(`Could not persist preference to ${p}: ${msg}`);
+    console.warn('You will be re-prompted on the next create. Worktree creation continues.');
+  }
 }
