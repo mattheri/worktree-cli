@@ -21,36 +21,42 @@ vi.mock('child_process', () => ({
 
 const fs = (await import('fs')).default;
 const { execSync } = await import('child_process');
-const { resolveRcFileName, isShellIntegrationInstalled, MARKER, WorktreeSetup } = await import(
-  './setup.js'
-);
+const {
+  resolveRcFileName,
+  isShellIntegrationInstalled,
+  MARKER,
+  WorktreeSetup,
+  WorktreeUninstall,
+} = await import('./setup.js');
 
 const CANONICAL_BLOCK = `# worktree-cli shell integration
 wt() {
-  rm -f /tmp/.wt-cd-target
+  rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
   wt-cli "$@"
   if [[ -f /tmp/.wt-cd-target ]]; then
-    local target
+    local target launch_claude=0
     target=$(cat /tmp/.wt-cd-target)
-    rm -f /tmp/.wt-cd-target
+    [[ -f /tmp/.wt-launch-claude ]] && launch_claude=1
+    rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
     cd "$target"
+    [[ $launch_claude -eq 1 ]] && command claude
   fi
 }
 
 claude() {
   if [[ "$1" == "-w" ]]; then
-    if [[ -z "$2" ]]; then
-      echo "claude -w requires a worktree name" >&2
-      return 1
+    shift
+    rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
+    if [[ -n "$1" && "$1" != -* ]]; then
+      local name="$1"; shift
+      wt-cli --action=create --launch-claude --name="$name"
+    else
+      wt-cli --action=create --launch-claude
     fi
-    local name="$2"
-    shift 2
-    rm -f /tmp/.wt-cd-target
-    wt-cli --action=create --name="$name"
     if [[ -f /tmp/.wt-cd-target ]]; then
       local target
       target=$(cat /tmp/.wt-cd-target)
-      rm -f /tmp/.wt-cd-target
+      rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
       cd "$target"
       command claude "$@"
     fi
@@ -256,5 +262,70 @@ describe('WorktreeSetup.init', () => {
     expect(fs.writeFileSync).not.toHaveBeenCalled();
     expect(fs.appendFileSync).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('wt-cli is not on your PATH'));
+  });
+});
+
+describe('WorktreeUninstall.init', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalShell: string | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    originalShell = process.env.SHELL;
+    process.env.SHELL = '/bin/zsh';
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    process.env.SHELL = originalShell;
+  });
+
+  it('removes the canonical block and preserves prelude/postlude', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(`# prelude\n\n${CANONICAL_BLOCK}# postlude\n`);
+
+    await new WorktreeUninstall().init();
+
+    expect(fs.writeFileSync).toHaveBeenCalledWith('/home/me/.zshrc', '# prelude\n\n# postlude\n');
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Removed shell integration'));
+  });
+
+  it('removes a legacy wt-only block', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(`# prelude\n\n${STALE_LEGACY_BLOCK}# postlude\n`);
+
+    await new WorktreeUninstall().init();
+
+    expect(fs.writeFileSync).toHaveBeenCalledWith('/home/me/.zshrc', '# prelude\n\n# postlude\n');
+  });
+
+  it('logs "nothing to clean up" and writes nothing when MARKER is absent', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('# unrelated config\n');
+
+    await new WorktreeUninstall().init();
+
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Nothing to clean up'));
+  });
+
+  it('does nothing when rc file is missing', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    await new WorktreeUninstall().init();
+
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Nothing to clean up'));
+  });
+
+  it('does nothing on unsupported shells', async () => {
+    process.env.SHELL = '/usr/bin/fish';
+
+    await new WorktreeUninstall().init();
+
+    expect(fs.existsSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
   });
 });

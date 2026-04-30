@@ -10,11 +10,24 @@ import { WorktreeRoot } from './worktree/root.js';
 import { WorktreeClean } from './worktree/clean.js';
 import { WorktreeCreate } from './worktree/create.js';
 import { WorktreeUpdate } from './worktree/update.js';
-import { WorktreeSetup, isShellIntegrationInstalled } from './worktree/setup.js';
+import {
+  WorktreeSetup,
+  WorktreeUninstall,
+  isShellIntegrationInstalled,
+} from './worktree/setup.js';
 
 const { prompt } = enquirer;
 
-export type Action = 'list' | 'cd' | 'root' | 'clean' | 'create' | 'update' | 'setup' | 'exit';
+export type Action =
+  | 'list'
+  | 'cd'
+  | 'root'
+  | 'clean'
+  | 'create'
+  | 'update'
+  | 'setup'
+  | 'uninstall'
+  | 'exit';
 
 interface InitOptions {
   action?: Action | string | true | null;
@@ -94,6 +107,11 @@ class WorktreeCLI {
         case 'setup': {
           const setup = new WorktreeSetup();
           await setup.init();
+          break;
+        }
+        case 'uninstall': {
+          const uninstall = new WorktreeUninstall();
+          await uninstall.init();
           break;
         }
         case 'exit':

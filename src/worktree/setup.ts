@@ -8,30 +8,32 @@ export const MARKER = '# worktree-cli shell integration';
 
 const SHELL_FUNCTION = `${MARKER}
 wt() {
-  rm -f /tmp/.wt-cd-target
+  rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
   wt-cli "$@"
   if [[ -f /tmp/.wt-cd-target ]]; then
-    local target
+    local target launch_claude=0
     target=$(cat /tmp/.wt-cd-target)
-    rm -f /tmp/.wt-cd-target
+    [[ -f /tmp/.wt-launch-claude ]] && launch_claude=1
+    rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
     cd "$target"
+    [[ $launch_claude -eq 1 ]] && command claude
   fi
 }
 
 claude() {
   if [[ "$1" == "-w" ]]; then
-    if [[ -z "$2" ]]; then
-      echo "claude -w requires a worktree name" >&2
-      return 1
+    shift
+    rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
+    if [[ -n "$1" && "$1" != -* ]]; then
+      local name="$1"; shift
+      wt-cli --action=create --launch-claude --name="$name"
+    else
+      wt-cli --action=create --launch-claude
     fi
-    local name="$2"
-    shift 2
-    rm -f /tmp/.wt-cd-target
-    wt-cli --action=create --name="$name"
     if [[ -f /tmp/.wt-cd-target ]]; then
       local target
       target=$(cat /tmp/.wt-cd-target)
-      rm -f /tmp/.wt-cd-target
+      rm -f /tmp/.wt-cd-target /tmp/.wt-launch-claude
       cd "$target"
       command claude "$@"
     fi
@@ -46,6 +48,10 @@ claude() {
 // keeps us from stopping at `wt()`'s closing `}` when `claude()` follows.
 const BLOCK_REGEX =
   /# worktree-cli shell integration\nwt\(\) \{[\s\S]*?\n\}\n+claude\(\) \{[\s\S]*?\n\}\n?/;
+
+// Pre-claude-wrapper blocks only had `wt()`. Match MARKER through `wt()`'s
+// closing `}` (no `claude()` following).
+const LEGACY_BLOCK_REGEX = /# worktree-cli shell integration\nwt\(\) \{[\s\S]*?\n\}\n?/;
 
 // macOS Terminal.app opens login shells by default, which read .bash_profile
 // rather than .bashrc — so on darwin we target .bash_profile for bash users.
@@ -136,11 +142,40 @@ class WorktreeSetup {
   }
 }
 
-// Pre-claude-wrapper blocks only had `wt()`. Match MARKER through `wt()`'s
-// closing `}` (no `claude()` following) and replace with the full canonical block.
 function replaceLegacyBlock(existing: string, replacement: string): string {
-  const legacy = /# worktree-cli shell integration\nwt\(\) \{[\s\S]*?\n\}\n?/;
-  return existing.replace(legacy, replacement);
+  return existing.replace(LEGACY_BLOCK_REGEX, replacement);
 }
 
-export { WorktreeSetup };
+class WorktreeUninstall {
+  async init(): Promise<void> {
+    const rcFileName = resolveRcFileName();
+    if (!rcFileName) return;
+
+    const rcPath = path.join(os.homedir(), rcFileName);
+    const displayPath = `~/${rcFileName}`;
+
+    if (!fs.existsSync(rcPath)) {
+      console.log(`${colors.yellow}Nothing to clean up in ${displayPath}${colors.reset}`);
+      return;
+    }
+
+    const existing = fs.readFileSync(rcPath, 'utf-8');
+    if (!existing.includes(MARKER)) {
+      console.log(`${colors.yellow}Nothing to clean up in ${displayPath}${colors.reset}`);
+      return;
+    }
+
+    let cleaned = existing.replace(BLOCK_REGEX, '');
+    if (cleaned === existing) {
+      cleaned = cleaned.replace(LEGACY_BLOCK_REGEX, '');
+    }
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+    fs.writeFileSync(rcPath, cleaned);
+    console.log(
+      `${colors.green}Removed shell integration from ${displayPath}${colors.reset}`
+    );
+  }
+}
+
+export { WorktreeSetup, WorktreeUninstall };

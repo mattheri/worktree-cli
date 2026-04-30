@@ -7,6 +7,7 @@ const cleanInit = vi.fn().mockResolvedValue(undefined);
 const createInit = vi.fn().mockResolvedValue(undefined);
 const updateInit = vi.fn().mockResolvedValue(undefined);
 const setupInit = vi.fn().mockResolvedValue(undefined);
+const uninstallInit = vi.fn().mockResolvedValue(undefined);
 const isShellIntegrationInstalled = vi.fn().mockReturnValue(false);
 
 vi.mock('./worktree/list.js', () => ({
@@ -42,6 +43,9 @@ vi.mock('./worktree/update.js', () => ({
 vi.mock('./worktree/setup.js', () => ({
   WorktreeSetup: vi.fn(function (this: { init: typeof setupInit }) {
     this.init = setupInit;
+  }),
+  WorktreeUninstall: vi.fn(function (this: { init: typeof uninstallInit }) {
+    this.init = uninstallInit;
   }),
   isShellIntegrationInstalled: () => isShellIntegrationInstalled(),
 }));
@@ -198,6 +202,16 @@ describe('WorktreeCLI', () => {
     await new Promise((r) => setImmediate(r));
 
     expect(setupInit).toHaveBeenCalledTimes(1);
+    expect(promptMock).not.toHaveBeenCalled();
+  });
+
+  it('uninstall action runs WorktreeUninstall.init and does NOT re-enter init', async () => {
+    process.argv = ['node', 'cli', '--action', 'uninstall'];
+
+    new WorktreeCLI();
+    await new Promise((r) => setImmediate(r));
+
+    expect(uninstallInit).toHaveBeenCalledTimes(1);
     expect(promptMock).not.toHaveBeenCalled();
   });
 

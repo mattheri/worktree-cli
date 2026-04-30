@@ -5,6 +5,13 @@ export const toolsUtility = {
     return execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
   },
   getFlag(flagName: string): string | true | null {
+    const eqPrefix = `--${flagName}=`;
+    const eqArg = process.argv.find((a) => a.startsWith(eqPrefix));
+    if (eqArg !== undefined) {
+      const value = eqArg.slice(eqPrefix.length);
+      return value === '' ? true : value;
+    }
+
     const flagIndex = process.argv.indexOf(`--${flagName}`);
 
     if (flagIndex === -1) {

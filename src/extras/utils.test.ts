@@ -37,6 +37,22 @@ describe('toolsUtility.getFlag', () => {
     process.argv = ['node', 'script.js', '--action', '--verbose'];
     expect(toolsUtility.getFlag('action')).toBe(true);
   });
+
+  it('parses --flag=value form', () => {
+    process.argv = ['node', 'script.js', '--action=list'];
+    expect(toolsUtility.getFlag('action')).toBe('list');
+  });
+
+  it('returns true for --flag= with empty value', () => {
+    process.argv = ['node', 'script.js', '--action='];
+    expect(toolsUtility.getFlag('action')).toBe(true);
+  });
+
+  it('parses --flag=value when interleaved with other flags', () => {
+    process.argv = ['node', 'script.js', '--launch-claude', '--name=foo'];
+    expect(toolsUtility.getFlag('name')).toBe('foo');
+    expect(toolsUtility.getFlag('launch-claude')).toBe(true);
+  });
 });
 
 describe('toolsUtility.branchName', () => {
