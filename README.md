@@ -1,6 +1,6 @@
 # worktree-cli
 
-Interactive CLI for managing git worktrees: list, jump between, clean up, and bulk-update against `master`.
+Interactive CLI for managing git worktrees: list, jump between, clean up, and bulk-update against your repo's default branch (`main` or `master`).
 
 ## Install
 
@@ -30,9 +30,9 @@ You'll get an interactive menu:
 | List | Show every worktree with branch, clean/dirty status, and merge state |
 | Change directory | Autocomplete-pick a worktree and `cd` into it |
 | Go to root | `cd` back to the repo root |
-| Create | Prompt for a name (with a dynamic char budget) and create a worktree off `master` |
-| Clean | Auto-remove merged+clean worktrees, prompt for the rest, then prune stale refs |
-| Update | Fetch `origin/master` and merge into every worktree (per-branch handling for dirty trees: stash / merge anyway / skip) |
+| Create | Prompt for a name (with a dynamic char budget) and create a worktree off `origin/<default-branch>` |
+| Clean | Fetch the default branch, auto-remove worktrees merged into `origin/<default>`, prompt for the rest, then prune stale refs |
+| Update | Fetch `origin/<default-branch>` and merge into every worktree (per-branch handling for dirty trees: stash / merge anyway / skip) |
 | Setup | Re-install the shell integration |
 
 You can skip the menu by passing `--action`:
@@ -51,7 +51,7 @@ claude -w            # prompts for the name
 claude -w my-feature # uses the given name
 ```
 
-It creates the worktree off `master`, `cd`s into it, and launches `claude` for you.
+It creates the worktree off `origin/<default-branch>`, `cd`s into it, and launches `claude` for you.
 
 ### `WorktreeCreate` hooks
 

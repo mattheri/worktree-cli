@@ -1,5 +1,6 @@
 import enquirer from 'enquirer';
 import { colors } from '../extras/colors.js';
+import { getDefaultBranch } from './worktree.constants.js';
 import { worktreeLibrary, type Worktree } from './worktree.library.js';
 
 interface PromptCtor {
@@ -14,8 +15,9 @@ const { Select } = enquirer as unknown as { Select: PromptCtor };
 
 const messages = {
   noWorktrees: `${colors.yellow}No worktrees found.${colors.reset}`,
-  fetching: `\n🔄 Fetching origin/master...`,
-  fetchFailed: (err: string) => `${colors.red}Failed to fetch origin/master:${colors.reset} ${err}`,
+  fetching: (branch: string) => `\n🔄 Fetching origin/${branch}...`,
+  fetchFailed: (branch: string, err: string) =>
+    `${colors.red}Failed to fetch origin/${branch}:${colors.reset} ${err}`,
   phase1Header: `\n📦 Updating clean worktrees...`,
   phase2Header: `\n⚠️  Dirty worktrees (uncommitted changes):`,
   updated: (branch: string) =>
@@ -36,7 +38,8 @@ const messages = {
     `\n${colors.yellowBold}⚠️  ${count} worktree${count !== 1 ? 's were' : ' was'} NOT updated due to merge conflicts:${colors.reset}`,
   conflictBranch: (branch: string) =>
     `    ${colors.red}-${colors.reset} ${colors.cyan}${branch}${colors.reset}`,
-  conflictHint: `    ${colors.dim}Resolve manually: wt cd <branch> && git merge master${colors.reset}`,
+  conflictHint: (branch: string) =>
+    `    ${colors.dim}Resolve manually: wt cd <branch> && git merge origin/${branch}${colors.reset}`,
 };
 
 function getStderrOrMessage(err: unknown): string {
@@ -53,11 +56,12 @@ class WorktreeUpdate {
       return;
     }
 
-    console.log(messages.fetching);
+    const defaultBranch = getDefaultBranch();
+    console.log(messages.fetching(defaultBranch));
     try {
-      worktreeLibrary.fetchMaster();
+      worktreeLibrary.fetchDefaultBranch();
     } catch (err) {
-      console.log(messages.fetchFailed(getStderrOrMessage(err)));
+      console.log(messages.fetchFailed(defaultBranch, getStderrOrMessage(err)));
       return;
     }
 
@@ -76,7 +80,7 @@ class WorktreeUpdate {
     if (clean.length > 0) {
       console.log(messages.phase1Header);
       for (const wt of clean) {
-        const result = worktreeLibrary.mergeMasterInto(wt.path);
+        const result = worktreeLibrary.mergeDefaultBranchInto(wt.path);
         if (result.status === 'updated') {
           console.log(messages.updated(wt.branch));
           updatedCount++;
@@ -122,7 +126,7 @@ class WorktreeUpdate {
           }
         }
 
-        const result = worktreeLibrary.mergeMasterInto(wt.path);
+        const result = worktreeLibrary.mergeDefaultBranchInto(wt.path);
 
         if (stashed) {
           try {
@@ -151,7 +155,7 @@ class WorktreeUpdate {
       for (const branch of conflicts) {
         console.log(messages.conflictBranch(branch));
       }
-      console.log(messages.conflictHint);
+      console.log(messages.conflictHint(defaultBranch));
     }
   }
 }

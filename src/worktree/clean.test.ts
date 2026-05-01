@@ -8,6 +8,10 @@ import {
   singleWorktree,
 } from '../../tests/fixtures/worktrees.js';
 
+vi.mock('./worktree.constants.js', () => ({
+  getDefaultBranch: vi.fn(() => 'main'),
+}));
+
 vi.mock('./worktree.library.js', () => ({
   worktreeLibrary: {
     getWorktrees: vi.fn(),
@@ -16,6 +20,7 @@ vi.mock('./worktree.library.js', () => ({
     removeWorktree: vi.fn(() => true),
     promptConfirmation: vi.fn(),
     pruneWorktrees: vi.fn(),
+    fetchDefaultBranch: vi.fn(),
   },
 }));
 
@@ -81,6 +86,28 @@ describe('WorktreeClean.init', () => {
     expect(worktreeLibrary.removeWorktree).not.toHaveBeenCalled();
     expect(worktreeLibrary.pruneWorktrees).toHaveBeenCalledTimes(1);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('All clean!'));
+  });
+
+  it('fetches default branch before checking merged-ness', async () => {
+    vi.mocked(worktreeLibrary.getWorktrees).mockReturnValue([wtMerged]);
+    vi.mocked(worktreeLibrary.getMergedBranches).mockReturnValue(new Set([wtMerged.branch]));
+
+    await new WorktreeClean().init();
+
+    expect(worktreeLibrary.fetchDefaultBranch).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues with stale data and warns when fetch fails', async () => {
+    vi.mocked(worktreeLibrary.getWorktrees).mockReturnValue([wtMerged]);
+    vi.mocked(worktreeLibrary.getMergedBranches).mockReturnValue(new Set([wtMerged.branch]));
+    vi.mocked(worktreeLibrary.fetchDefaultBranch).mockImplementationOnce(() => {
+      throw Object.assign(new Error('boom'), { stderr: Buffer.from('network error') });
+    });
+
+    await new WorktreeClean().init();
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Warning: failed to fetch'));
+    expect(worktreeLibrary.removeWorktree).toHaveBeenCalledWith(wtMerged.path);
   });
 
   it('still calls pruneWorktrees even when remove fails', async () => {

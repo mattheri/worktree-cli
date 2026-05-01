@@ -14,6 +14,7 @@ vi.mock('fs', () => ({
 vi.mock('./worktree.constants.js', () => ({
   getRepoRoot: () => '/repo',
   getWorktreesDir: () => '/repo/.claude/worktrees',
+  getDefaultBranch: () => 'main',
 }));
 
 const findHooksMock = vi.fn();
@@ -109,7 +110,7 @@ describe('WorktreeCreate', () => {
     expect(promptMock).not.toHaveBeenCalled();
     expect(saveConfigMock).not.toHaveBeenCalled();
     expect(execSync).toHaveBeenCalledWith(
-      'git worktree add -b "my-feature" "/repo/.claude/worktrees/my-feature" master',
+      'git worktree add -b "my-feature" "/repo/.claude/worktrees/my-feature" "origin/main"',
       expect.objectContaining({ stdio: 'pipe' })
     );
     expect(fs.writeFileSync).toHaveBeenCalledWith(

@@ -1,10 +1,14 @@
 import { colors } from '../extras/colors.js';
+import { getDefaultBranch } from './worktree.constants.js';
 import { worktreeLibrary, type WorktreeStatus } from './worktree.library.js';
 
 const messages = {
+  fetching: (branch: string) => `\n🔄 Fetching origin/${branch}...`,
+  fetchFailed: (branch: string, err: string) =>
+    `${colors.yellow}Warning: failed to fetch origin/${branch}; using last-fetched state.${colors.reset} ${err}`,
   scanning: `\n🔍 Scanning worktrees...`,
-  autoRemoved: (branch: string) =>
-    `  ${colors.green}✓${colors.reset} Removed ${colors.cyan}${branch}${colors.reset} (merged to master)`,
+  autoRemoved: (branch: string, defaultBranch: string) =>
+    `  ${colors.green}✓${colors.reset} Removed ${colors.cyan}${branch}${colors.reset} (merged to ${defaultBranch})`,
   promptRemove: (branch: string, status: WorktreeStatus) =>
     `Remove ${colors.cyan}${branch}${colors.reset}? (${status === 'dirty' ? colors.yellow + 'dirty' + colors.reset : 'clean'}, not merged)`,
   pruning: `\n🧹 Pruning stale references...`,
@@ -14,6 +18,11 @@ const messages = {
   nothingToClean: `\n${colors.green}All clean!${colors.reset} No worktrees to remove.`,
 };
 
+function getStderrOrMessage(err: unknown): string {
+  const e = err as { stderr?: { toString(): string }; message?: string };
+  return e.stderr?.toString() || e.message || String(err);
+}
+
 class WorktreeClean {
   async init(): Promise<void> {
     const worktrees = worktreeLibrary.getWorktrees();
@@ -21,6 +30,14 @@ class WorktreeClean {
     if (worktrees.length === 0) {
       console.log(messages.noWorktrees);
       return;
+    }
+
+    const defaultBranch = getDefaultBranch();
+    console.log(messages.fetching(defaultBranch));
+    try {
+      worktreeLibrary.fetchDefaultBranch();
+    } catch (err) {
+      console.log(messages.fetchFailed(defaultBranch, getStderrOrMessage(err)));
     }
 
     const mergedBranches = worktreeLibrary.getMergedBranches();
@@ -35,7 +52,7 @@ class WorktreeClean {
     for (const wt of merged) {
       const removed = worktreeLibrary.removeWorktree(wt.path);
       if (removed) {
-        console.log(messages.autoRemoved(wt.branch));
+        console.log(messages.autoRemoved(wt.branch, defaultBranch));
         removedCount++;
       }
     }

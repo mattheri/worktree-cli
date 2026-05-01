@@ -16,6 +16,7 @@ vi.mock('child_process', () => ({
 vi.mock('./worktree.constants.js', () => ({
   getRepoRoot: vi.fn(() => REPO_ROOT),
   getWorktreesDir: vi.fn(() => WORKTREES_DIR),
+  getDefaultBranch: vi.fn(() => 'main'),
 }));
 
 const promptMock = vi.fn();
@@ -75,6 +76,7 @@ describe('worktreeLibrary.getMergedBranches', () => {
     const result = worktreeLibrary.getMergedBranches();
 
     expect(result).toEqual(new Set(['main', 'feature-a', 'feature-b']));
+    expect(execSync).toHaveBeenCalledWith('git branch --merged origin/main');
   });
 
   it('returns an empty Set when execSync throws', () => {
@@ -153,7 +155,7 @@ describe('worktreeLibrary.removeWorktree', () => {
   });
 });
 
-describe('worktreeLibrary.pruneWorktrees / fetchMaster', () => {
+describe('worktreeLibrary.pruneWorktrees / fetchDefaultBranch', () => {
   beforeEach(() => {
     vi.mocked(execSync).mockReset();
   });
@@ -164,29 +166,30 @@ describe('worktreeLibrary.pruneWorktrees / fetchMaster', () => {
     expect(execSync).toHaveBeenCalledWith('git worktree prune');
   });
 
-  it('fetchMaster calls git fetch origin master', () => {
+  it('fetchDefaultBranch calls git fetch origin <default>', () => {
     vi.mocked(execSync).mockReturnValueOnce(Buffer.from(''));
-    worktreeLibrary.fetchMaster();
+    worktreeLibrary.fetchDefaultBranch();
     expect(execSync).toHaveBeenCalledWith(
-      'git fetch origin master',
+      'git fetch origin main',
       expect.objectContaining({ stdio: 'pipe' })
     );
   });
 });
 
-describe('worktreeLibrary.mergeMasterInto', () => {
+describe('worktreeLibrary.mergeDefaultBranchInto', () => {
   beforeEach(() => {
     vi.mocked(execSync).mockReset();
   });
 
   it('returns up-to-date when the merge output matches', () => {
     vi.mocked(execSync).mockReturnValueOnce(Buffer.from(mergeUpToDateOutput()));
-    expect(worktreeLibrary.mergeMasterInto('/wt')).toEqual({ status: 'up-to-date' });
+    expect(worktreeLibrary.mergeDefaultBranchInto('/wt')).toEqual({ status: 'up-to-date' });
   });
 
   it('returns updated when the merge applied changes', () => {
     vi.mocked(execSync).mockReturnValueOnce(Buffer.from(mergeUpdatedOutput()));
-    expect(worktreeLibrary.mergeMasterInto('/wt')).toEqual({ status: 'updated' });
+    expect(worktreeLibrary.mergeDefaultBranchInto('/wt')).toEqual({ status: 'updated' });
+    expect(vi.mocked(execSync).mock.calls[0]?.[0]).toContain('merge origin/main');
   });
 
   it('returns conflict and attempts merge --abort cleanup when merge fails', () => {
@@ -199,7 +202,7 @@ describe('worktreeLibrary.mergeMasterInto', () => {
       })
       .mockReturnValueOnce(Buffer.from(''));
 
-    const result = worktreeLibrary.mergeMasterInto('/wt');
+    const result = worktreeLibrary.mergeDefaultBranchInto('/wt');
 
     expect(result.status).toBe('conflict');
     if (result.status === 'conflict') {
@@ -217,7 +220,7 @@ describe('worktreeLibrary.mergeMasterInto', () => {
         throw new Error('abort fail');
       });
 
-    expect(worktreeLibrary.mergeMasterInto('/wt').status).toBe('conflict');
+    expect(worktreeLibrary.mergeDefaultBranchInto('/wt').status).toBe('conflict');
   });
 });
 

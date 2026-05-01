@@ -4,7 +4,7 @@ import path from 'path';
 import enquirer from 'enquirer';
 import { colors } from '../extras/colors.js';
 import { toolsUtility } from '../extras/utils.js';
-import { getRepoRoot, getWorktreesDir } from './worktree.constants.js';
+import { getDefaultBranch, getRepoRoot, getWorktreesDir } from './worktree.constants.js';
 import { loadConfig, saveConfig, type Creator } from './config.js';
 import { findHooks, runHook } from './hooks.js';
 
@@ -82,7 +82,8 @@ class WorktreeCreate {
         wtPath = out;
       } else {
         wtPath = path.join(dir, name);
-        execSync(`git worktree add -b "${name}" "${wtPath}" master`, { stdio: 'pipe' });
+        const base = `origin/${getDefaultBranch()}`;
+        execSync(`git worktree add -b "${name}" "${wtPath}" "${base}"`, { stdio: 'pipe' });
       }
     } catch (err) {
       const e = err as { stderr?: { toString(): string }; message?: string };

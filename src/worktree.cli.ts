@@ -37,10 +37,10 @@ const messages = {
   actions: {
     list: '📋 List worktrees',
     cd: '📂 Checkout worktree',
-    root: '🏠 Checkout master',
+    root: '🏠 Checkout repo root',
     create: '➕ Create worktree',
     clean: '🧹 Clean worktrees',
-    update: '🔄 Update worktrees with master',
+    update: '🔄 Update worktrees with default branch',
     setup: '⚙️  Setup shell integration',
     exit: '🚪 Exit',
   },

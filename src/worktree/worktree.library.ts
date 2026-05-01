@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import pkg from 'enquirer';
 import { colors } from '../extras/colors.js';
-import { getWorktreesDir } from './worktree.constants.js';
+import { getDefaultBranch, getWorktreesDir } from './worktree.constants.js';
 
 const { prompt } = pkg;
 
@@ -23,8 +23,8 @@ export interface WorktreeLibrary {
   getWorktreeStatus(wtPath: string): WorktreeStatus;
   removeWorktree(wtPath: string): boolean;
   pruneWorktrees(): void;
-  fetchMaster(): void;
-  mergeMasterInto(wtPath: string): MergeResult;
+  fetchDefaultBranch(): void;
+  mergeDefaultBranchInto(wtPath: string): MergeResult;
   stashPush(wtPath: string): boolean;
   stashPop(wtPath: string): void;
   promptConfirmation(message: string): Promise<boolean>;
@@ -58,7 +58,7 @@ export const worktreeLibrary: WorktreeLibrary = {
 
   getMergedBranches() {
     try {
-      const output = execSync('git branch --merged master').toString();
+      const output = execSync(`git branch --merged origin/${getDefaultBranch()}`).toString();
       const branches = output
         .split('\n')
         .map((line) => line.trim().replace(/^[*+]\s*/, ''))
@@ -103,15 +103,16 @@ export const worktreeLibrary: WorktreeLibrary = {
     execSync('git worktree prune');
   },
 
-  fetchMaster() {
-    execSync('git fetch origin master', { stdio: 'pipe' });
+  fetchDefaultBranch() {
+    execSync(`git fetch origin ${getDefaultBranch()}`, { stdio: 'pipe' });
   },
 
-  mergeMasterInto(wtPath) {
+  mergeDefaultBranchInto(wtPath) {
     try {
-      const output = execSync(`git -C "${wtPath}" merge origin/master --no-edit`, {
-        stdio: 'pipe',
-      }).toString();
+      const output = execSync(
+        `git -C "${wtPath}" merge origin/${getDefaultBranch()} --no-edit`,
+        { stdio: 'pipe' }
+      ).toString();
       if (/Already up to date/i.test(output)) return { status: 'up-to-date' };
       return { status: 'updated' };
     } catch (err) {
